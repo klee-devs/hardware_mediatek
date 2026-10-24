@@ -14,8 +14,6 @@ import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.media.AudioDeviceInfo;
 
-import android.util.Log;
-
 public class VolumeChangeReceiver extends BroadcastReceiver {
     public static final String LOG_TAG = "MediatekInCallService";
 
@@ -25,12 +23,7 @@ public class VolumeChangeReceiver extends BroadcastReceiver {
         mAudioManager = audioManager;
     }
 
-    private void handleVolumeStateChange(Intent intent) {
-        boolean volumeChanged = AudioManager.VOLUME_CHANGED_ACTION.equals(intent.getAction());
-        boolean routeChanged = AudioManager.STREAM_DEVICES_CHANGED_ACTION.equals(intent.getAction());
-        if (!volumeChanged && !routeChanged) {
-            return;
-        }
+    private void handleCallVolumeChange(Intent intent, boolean volumeChanged) {
         if (volumeChanged && intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1)
                 != AudioManager.STREAM_VOICE_CALL) {
             return;
@@ -45,7 +38,8 @@ public class VolumeChangeReceiver extends BroadcastReceiver {
         }
 
         int volumeIndex = volumeChanged
-                ? intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_VALUE, -1) : -1;
+                ? intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_VALUE, -1)
+                : -1;
         if (volumeIndex == -1) {
             volumeIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
         }
@@ -53,8 +47,55 @@ public class VolumeChangeReceiver extends BroadcastReceiver {
         GainUtils.setGainLevel(callDevice.getType(), volumeIndex, AudioSystem.STREAM_VOICE_CALL);
     }
 
+    private void handleMediaVolumeChange(Intent intent, boolean volumeChanged) {
+        int streamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
+        if (!SuperVolumeUtils.supportsStream(streamType)) {
+            return;
+        }
+
+        int volumeIndex = volumeChanged
+                ? intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_VALUE, -1)
+                : -1;
+        SuperVolumeUtils.update(mAudioManager, streamType, volumeIndex);
+    }
+
+    public void syncSuperVolumes() {
+        SuperVolumeUtils.syncAll(mAudioManager);
+    }
+
+    public void syncMusicSuperVolume() {
+        SuperVolumeUtils.syncMusic(mAudioManager);
+    }
+
+    private void handleVolumeStateChange(Intent intent) {
+        boolean volumeChanged = AudioManager.VOLUME_CHANGED_ACTION.equals(intent.getAction());
+        boolean routeChanged =
+                AudioManager.STREAM_DEVICES_CHANGED_ACTION.equals(intent.getAction());
+        if (!volumeChanged && !routeChanged) {
+            return;
+        }
+
+        if (volumeChanged) {
+            int streamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
+            if (streamType == AudioManager.STREAM_VOICE_CALL) {
+                handleCallVolumeChange(intent, true);
+            } else {
+                handleMediaVolumeChange(intent, true);
+            }
+            return;
+        }
+
+        int streamType = intent.getIntExtra(AudioManager.EXTRA_VOLUME_STREAM_TYPE, -1);
+        if (SuperVolumeUtils.supportsStream(streamType)) {
+            handleMediaVolumeChange(intent, false);
+        } else if (streamType < 0) {
+            syncSuperVolumes();
+        }
+        handleCallVolumeChange(intent, false);
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
-            handleVolumeStateChange(intent);
+        handleVolumeStateChange(intent);
     }
 }
