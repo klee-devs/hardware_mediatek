@@ -7,6 +7,8 @@
 package org.lineageos.mediatek.incallservice;
 
 import android.media.AudioManager;
+import android.media.AudioDeviceInfo;
+import android.media.AudioSystem;
 
 import android.telephony.TelephonyManager;
 import android.telephony.TelephonyCallback;
@@ -24,8 +26,19 @@ public class CallStateListener extends TelephonyCallback implements TelephonyCal
     @Override
     public void onCallStateChanged(int state) {
         if (state == TelephonyManager.CALL_STATE_OFFHOOK || state == TelephonyManager.CALL_STATE_RINGING) {
-            Log.d(LOG_TAG, "CallStateListener: CALL_STATE_OFFHOOK, setting gain.");
-            GainUtils.setGainLevel(mAudioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL));
+            Log.d(LOG_TAG, "CallStateListener: call active, setting gain.");
+            int volumeIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
+            GainUtils.setGainLevel(volumeIndex);
+
+            AudioDeviceInfo callDevice = mAudioManager.getCommunicationDevice();
+            if (state == TelephonyManager.CALL_STATE_OFFHOOK
+                    && mAudioManager.getMode() == AudioManager.MODE_IN_CALL
+                    && callDevice != null) {
+                GainUtils.updateCallVolumeBoost(callDevice.getType(), volumeIndex,
+                        AudioSystem.STREAM_VOICE_CALL);
+            }
+        } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+            GainUtils.clearCallVolumeBoost();
         }
     }
 }

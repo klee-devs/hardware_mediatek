@@ -47,8 +47,9 @@ public class VolumeChangeService extends Service {
 
         Log.i(LOG_TAG, "Service is starting...");
 
-        this.registerReceiver(mVolumeChangeReceiver,
-                               new IntentFilter(AudioManager.VOLUME_CHANGED_ACTION));
+        IntentFilter volumeFilter = new IntentFilter(AudioManager.VOLUME_CHANGED_ACTION);
+        volumeFilter.addAction(AudioManager.STREAM_DEVICES_CHANGED_ACTION);
+        this.registerReceiver(mVolumeChangeReceiver, volumeFilter);
 
         telephonyManager.registerTelephonyCallback(getMainExecutor(), mCallStateListener);
 
