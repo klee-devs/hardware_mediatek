@@ -65,29 +65,56 @@ public class VolumeChangeService extends Service {
 
         Log.i(LOG_TAG, "Service is starting...");
 
-        if (mVolumeChangeReceiver == null) {
-            mVolumeChangeReceiver = new VolumeChangeReceiver(mAudioManager);
-            mCallStateListener = new CallStateListener(mAudioManager);
+        if (mAudioManager == null) {
+            Log.e(LOG_TAG, "AudioManager unavailable; volume monitoring cannot start");
+            return START_STICKY;
+        }
 
+        if (mVolumeChangeReceiver == null) {
+            VolumeChangeReceiver receiver = new VolumeChangeReceiver(mAudioManager);
             IntentFilter volumeFilter = new IntentFilter(AudioManager.VOLUME_CHANGED_ACTION);
             volumeFilter.addAction(AudioManager.STREAM_DEVICES_CHANGED_ACTION);
-            registerReceiver(mVolumeChangeReceiver, volumeFilter);
-            mTelephonyManager.registerTelephonyCallback(getMainExecutor(), mCallStateListener);
+            try {
+                registerReceiver(receiver, volumeFilter, Context.RECEIVER_NOT_EXPORTED);
+                mVolumeChangeReceiver = receiver;
+            } catch (SecurityException | IllegalArgumentException e) {
+                Log.e(LOG_TAG, "Unable to register volume-change receiver", e);
+            }
+        }
 
-            mPlaybackCallback = new AudioManager.AudioPlaybackCallback() {
+        if (mPlaybackCallback == null) {
+            AudioManager.AudioPlaybackCallback callback =
+                    new AudioManager.AudioPlaybackCallback() {
                 @Override
                 public void onPlaybackConfigChanged(
                         List<AudioPlaybackConfiguration> configs) {
-                    if (mVolumeChangeReceiver != null) {
-                        mVolumeChangeReceiver.syncMusicSuperVolume();
-                    }
+                    SuperVolumeUtils.syncAll(mAudioManager);
                 }
             };
-            mAudioManager.registerAudioPlaybackCallback(
-                    mPlaybackCallback, new Handler(getMainLooper()));
+            try {
+                mAudioManager.registerAudioPlaybackCallback(
+                        callback, new Handler(getMainLooper()));
+                mPlaybackCallback = callback;
+            } catch (IllegalArgumentException e) {
+                Log.e(LOG_TAG, "Unable to register audio playback callback", e);
+            }
         }
 
-        mVolumeChangeReceiver.syncSuperVolumes();
+        // Do this before the optional telephony callback so media boost remains
+        // initialized if READ_PHONE_STATE is denied by the permission manager.
+        SuperVolumeUtils.syncAll(mAudioManager);
+
+        if (mTelephonyManager != null && mCallStateListener == null) {
+            CallStateListener listener = new CallStateListener(mAudioManager);
+            try {
+                mTelephonyManager.registerTelephonyCallback(getMainExecutor(), listener);
+                mCallStateListener = listener;
+            } catch (SecurityException | IllegalStateException e) {
+                Log.w(LOG_TAG,
+                        "Call-state monitoring unavailable; media volume boost remains active",
+                        e);
+            }
+        }
 
         return START_STICKY;
     }
