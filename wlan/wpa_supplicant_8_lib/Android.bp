@@ -6,6 +6,9 @@
 cc_library_static {
     name: "lib_driver_cmd_mt66xx",
     vendor: true,
+    // Keep the helper ABI-compatible with the supplicant internals it accesses.
+    defaults: ["wpa_supplicant_cflags_defaults"],
+    cflags: ["-Wno-error"],
     sanitize: {
         cfi: true,
     },
