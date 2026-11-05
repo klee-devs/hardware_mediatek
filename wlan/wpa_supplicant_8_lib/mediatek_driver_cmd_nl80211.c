@@ -4,6 +4,7 @@
  */
 
 #include "includes.h"
+#include <ctype.h>
 #include "netlink/genl/genl.h"
 
 #include "common.h"
@@ -833,7 +834,26 @@ int wpa_driver_nl80211_driver_cmd(void* priv, char* cmd_src, char* buf, size_t b
     wpa_printf(MSG_INFO, "%s: %s recv cmd %s", __func__, bss->ifname, cmd);
     handled = 1;
 
-    if (os_strncasecmp(cmd, "GET_STA_STATISTICS ", 19) == 0) {
+    if (os_strncasecmp(cmd, "COUNTRY ", 8) == 0) {
+        char alpha2[3];
+        if (!wpa_s || strlen(cmd) != 10 ||
+            !isalnum((unsigned char)cmd[8]) || !isalnum((unsigned char)cmd[9])) {
+            wpa_printf(MSG_ERROR, "%s: invalid country command: %s", __func__, cmd);
+            return -EINVAL;
+        }
+
+        alpha2[0] = (char)toupper((unsigned char)cmd[8]);
+        alpha2[1] = (char)toupper((unsigned char)cmd[9]);
+        alpha2[2] = '\0';
+        ret = wpa_drv_set_country(wpa_s, alpha2);
+        if (ret < 0) {
+            wpa_printf(MSG_ERROR, "%s: failed to set regulatory country %s: %d", __func__,
+                       alpha2, ret);
+            return ret;
+        }
+        if (buf && buf_len > 0) buf[0] = '\0';
+        ret = 0;
+    } else if (os_strncasecmp(cmd, "GET_STA_STATISTICS ", 19) == 0) {
         if (wpa_s) ret = wpa_driver_get_sta_statistics(wpa_s, cmd + 19, buf, buf_len);
     } else if (os_strncasecmp(cmd, "MACADDR", 7) == 0) {
         u8 macaddr[ETH_ALEN] = {};
