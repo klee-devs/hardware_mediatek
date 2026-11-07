@@ -144,6 +144,24 @@ static nl_sock* wifi_create_nl_socket(int port) {
 
     return sock;
 }
+
+wifi_error wifi_wait_for_driver_ready(void) {
+    // Wait for the primary interface before WifiLegacyHal attempts to bring it up.
+    constexpr int kDriverReadyTimeoutMs = 10000;
+    constexpr int kDriverReadyPollIntervalMs = 100;
+
+    for (int waited_ms = 0; waited_ms < kDriverReadyTimeoutMs;
+         waited_ms += kDriverReadyPollIntervalMs) {
+        if (if_nametoindex("wlan0") != 0) {
+            ALOGI("Wi-Fi interface wlan0 is ready");
+            return WIFI_SUCCESS;
+        }
+        usleep(kDriverReadyPollIntervalMs * 1000);
+    }
+
+    ALOGE("Timed out waiting for Wi-Fi interface wlan0");
+    return WIFI_ERROR_TIMED_OUT;
+}
 /* Initialize vendor function pointer table with MTK HAL API */
 wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn* fn) {
     if (fn == NULL) {
@@ -225,7 +243,7 @@ wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn* fn) {
     fn->wifi_get_chip_capabilities = wifi_get_chip_capabilities;
     fn->wifi_get_supported_iface_concurrency_matrix = wifi_get_supported_iface_concurrency_matrix;
 
-    populateDummyFor(fn->wifi_wait_for_driver_ready);
+    fn->wifi_wait_for_driver_ready = wifi_wait_for_driver_ready;
     populateDummyFor(fn->wifi_set_nodfs_flag);
     populateDummyFor(fn->wifi_set_log_handler);
     populateDummyFor(fn->wifi_reset_log_handler);
