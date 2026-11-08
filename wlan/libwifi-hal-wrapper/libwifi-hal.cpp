@@ -7,6 +7,7 @@
 #define LOG_TAG "libwifi-hal-wrapper"
 
 #include <dlfcn.h>
+#include <net/if.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -26,6 +27,28 @@
 
 static wifi_hal_legacy_fn* fln = nullptr;
 static void* lib_handle = nullptr;
+
+static wifi_error wifi_hal_wrapper_wait_for_driver_ready(void) {
+    constexpr int kDriverReadyTimeoutMs = 10000;
+    constexpr int kDriverReadyPollIntervalMs = 100;
+
+    for (int waited_ms = 0; waited_ms <= kDriverReadyTimeoutMs;
+         waited_ms += kDriverReadyPollIntervalMs) {
+        if (if_nametoindex("wlan0") != 0) {
+            ALOGI("Wi-Fi interface wlan0 is present");
+            return fln && fln->wifi_wait_for_driver_ready
+                           ? fln->wifi_wait_for_driver_ready()
+                           : WIFI_SUCCESS;
+        }
+
+        if (waited_ms < kDriverReadyTimeoutMs) {
+            usleep(kDriverReadyPollIntervalMs * 1000);
+        }
+    }
+
+    ALOGE("Timed out waiting for Wi-Fi interface wlan0");
+    return WIFI_ERROR_TIMED_OUT;
+}
 
 wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn* fn) {
     init_wifi_vendor_hal_func_table_legacy_t init_fn;
@@ -58,7 +81,7 @@ wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn* fn) {
     }
 
     SET_IF_NOT_NULL(fn, fln, wifi_initialize);
-    SET_IF_NOT_NULL(fn, fln, wifi_wait_for_driver_ready);
+    fn->wifi_wait_for_driver_ready = wifi_hal_wrapper_wait_for_driver_ready;
     SET_IF_NOT_NULL(fn, fln, wifi_cleanup);
     SET_IF_NOT_NULL(fn, fln, wifi_event_loop);
     SET_IF_NOT_NULL(fn, fln, wifi_get_error_info);
