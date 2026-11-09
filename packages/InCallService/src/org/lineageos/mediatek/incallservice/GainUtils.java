@@ -79,9 +79,9 @@ public class GainUtils {
      * @param gainIndex The gain level to set.
      */
     public static void setGainLevel(int gainIndex) {
-        setGainLevel(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE, gainIndex,
+        setGainLevel(AudioSystem.DEVICE_OUT_EARPIECE, gainIndex,
                 AudioSystem.STREAM_VOICE_CALL, false);
-        setGainLevel(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, gainIndex,
+        setGainLevel(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, gainIndex,
                 AudioSystem.STREAM_VOICE_CALL, false);
     }
 }
