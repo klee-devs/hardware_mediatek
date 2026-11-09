@@ -7,7 +7,6 @@
 package org.lineageos.mediatek.incallservice;
 
 import android.media.AudioSystem;
-import android.media.AudioDeviceInfo;
 import android.os.SystemProperties;
 import android.util.Log;
 
@@ -57,9 +56,9 @@ public class GainUtils {
         }
 
         boolean supportedRoute =
-                (audioDevice == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+                (audioDevice == AudioSystem.DEVICE_OUT_EARPIECE
                         && (support & CALL_BOOST_HANDSET) != 0)
-                || (audioDevice == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+                || (audioDevice == AudioSystem.DEVICE_OUT_SPEAKER
                         && (support & CALL_BOOST_SPEAKER) != 0);
         boolean enabled = supportedRoute && gainIndex >= volSteps;
         String parameter = enabled ? "CustInfo=super_voice" : "CustInfo=false";
