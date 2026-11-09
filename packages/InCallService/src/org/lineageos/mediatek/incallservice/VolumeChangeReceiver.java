@@ -44,7 +44,9 @@ public class VolumeChangeReceiver extends BroadcastReceiver {
             volumeIndex = mAudioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL);
         }
 
-        GainUtils.setGainLevel(callDevice.getType(), volumeIndex, AudioSystem.STREAM_VOICE_CALL);
+        // MediaTek volumeDevice expects the internal audio_devices_t mask.
+        GainUtils.setGainLevel(callDevice.getPort().type(), volumeIndex,
+                AudioSystem.STREAM_VOICE_CALL);
     }
 
     private void handleMediaVolumeChange(Intent intent, boolean volumeChanged) {
